@@ -51,6 +51,15 @@
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
+              v-if="meta.key === 'semester_goal'"
+              class="link"
+              type="button"
+              :data-testid="`mentor-entry-${row.id}`"
+              @click="openMentorPanel(row)"
+            >
+              检索导师
+            </button>
+            <button
               v-for="action in meta.actions"
               :key="action"
               class="link"
@@ -90,6 +99,13 @@
       <span>共 {{ total }} 条{{ meta.name }}记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
+
+    <MentorSearchPanel
+      v-if="mentorGoal"
+      :goal="mentorGoal"
+      @close="mentorGoal = null"
+      @updated="reload"
+    />
   </section>
 </template>
 
@@ -103,6 +119,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/backend-service'
+import MentorSearchPanel from '@/components/MentorSearchPanel.vue'
 import type { EntryRow } from '@/data/types'
 
 const props = defineProps<{ moduleKey: string }>()
@@ -115,6 +132,11 @@ const filterFields = meta.fields.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const mentorGoal = ref<EntryRow | null>(null)
+
+function openMentorPanel(row: EntryRow) {
+  mentorGoal.value = row
+}
 const stats = computed(() => [
   { label: meta.metrics[0], value: total.value },
   { label: meta.metrics[1], value: rows.value.filter((row) => row.status === meta.statuses[1]).length },

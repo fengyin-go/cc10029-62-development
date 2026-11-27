@@ -17,6 +17,7 @@ from app.services.syllabus_rev import SyllabusRevService
 from app.services.teach_award import TeachAwardService
 from app.services.lesson_prep import LessonPrepService
 from app.services.mentor_pair import MentorPairService
+from app.services.mentor_roster import MentorRosterService
 from app.services.exam_analysis import ExamAnalysisService
 from app.services.class_schedule import ClassScheduleService
 from app.services.resource_apply import ResourceApplyService
@@ -39,6 +40,7 @@ SERVICES: dict[str, BaseModuleService] = {
     "teach_award": TeachAwardService(),
     "lesson_prep": LessonPrepService(),
     "mentor_pair": MentorPairService(),
+    "mentor_roster": MentorRosterService(),
     "exam_analysis": ExamAnalysisService(),
     "class_schedule": ClassScheduleService(),
     "resource_apply": ResourceApplyService(),

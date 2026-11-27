@@ -1,9 +1,10 @@
-"""学期目标领域服务：目标登记、审定、废止，含同学期冲突检测和师徒结对关联。"""
+"""学期目标领域服务：目标登记、审定、废止，含同学期冲突检测和导师结对关联。"""
 from __future__ import annotations
 
 from typing import Any
 
 from app.services.base import BaseModuleService
+from app.services.pairing import close_pair
 from app.store import store
 
 
@@ -11,7 +12,10 @@ class SemesterGoalService(BaseModuleService):
     MODULE = "semester_goal"
     ENTITY = "学期目标"
     OPERATION_TERM = "审定目标"
-    LIST_FIELDS = ["目标描述", "量化指标", "责任教师", "起始学期", "截止学期", "当前完成度", "上级目标", "备注说明"]
+    LIST_FIELDS = [
+        "目标描述", "量化指标", "责任教师", "起始学期", "截止学期",
+        "当前完成度", "上级目标", "备注说明",
+    ]
     REQUIRED_FIELDS = ["目标描述", "量化指标", "责任教师"]
     STATUS_ORDER = ["草稿", "待审定", "已审定", "已废止"]
     ACTION_RULES = {"审定目标": "已审定", "退回修订": "草稿", "废止目标": "已废止"}
@@ -33,7 +37,20 @@ class SemesterGoalService(BaseModuleService):
                         f"不能重复创建同教师同学期的目标"
                     )
 
-        return super().create_entry(values)
+        entry, missing = super().create_entry(values)
+        if entry is not None:
+            # 结对编排的附加字段：不属于通用列表字段，由目标服务自己补上。
+            entry["目标编号"] = str(values.get("目标编号") or "").strip() or f"G-{entry['id']}"
+            entry["结对状态"] = "未结对"
+            entry["候选资格"] = ""
+            entry["候选导师"] = ""
+            entry["候选学期"] = ""
+            entry["候选名额编号"] = None
+            entry["候选序号"] = 0
+            entry["结对记录编号"] = None
+            entry["待办状态"] = ""
+            entry["待办事项"] = ""
+        return entry, missing
 
     def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
         """执行动作，含冲突检测。"""
@@ -64,4 +81,12 @@ class SemesterGoalService(BaseModuleService):
             if entry.get("status") != "已审定":
                 return None, f"{self.ENTITY} {entry_id} 必须先审定，才能废止"
 
-        return super().run_action(entry_id, action)
+        result, message = super().run_action(entry_id, action)
+        if result is not None and action == "废止目标":
+            # 目标废止时释放尚未结项的结对占位，名额回到导师名录。
+            if result.get("结对记录编号"):
+                close_pair(int(result["结对记录编号"]), "学期目标已废止")
+            result["结对状态"] = "已解除"
+            result["待办状态"] = "需更换导师"
+            result["待办事项"] = "学期目标已废止，原指导名额已释放"
+        return result, message

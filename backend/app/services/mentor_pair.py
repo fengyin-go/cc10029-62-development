@@ -26,7 +26,9 @@ class MentorPairService(BaseModuleService):
         if mentor and teacher and mentor == teacher:
             raise ValueError("指导教师和青年教师不能是同一个人")
 
-        if mentor and date_range:
+        if mentor and date_range and values.get("名额编号") in (None, ""):
+            # 由导师名额发起的结对按名额容量控制，多条结对可以属于同一时段；
+            # 手工登记的结对仍沿用「同一时段只能有一段进行中」的旧约束。
             existing = store.rows("mentor_pair")
             for row in existing:
                 if (str(row.get("指导教师", "")).strip() == mentor
@@ -37,7 +39,14 @@ class MentorPairService(BaseModuleService):
                         f"不能同时被多个结对占用"
                     )
 
-        return super().create_entry(values)
+        entry, missing = super().create_entry(values)
+        if entry is not None:
+            entry["关联目标"] = values.get("关联目标")
+            entry["名额编号"] = values.get("名额编号")
+            entry["指导方向"] = values.get("指导方向", "")
+            entry["学期"] = values.get("学期", "")
+            entry["候选序号"] = values.get("候选序号", 0)
+        return entry, missing
 
     def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
         """执行动作，含业务约束和跨模块关联。"""
@@ -55,4 +64,16 @@ class MentorPairService(BaseModuleService):
             if entry.get("status") not in ("进行中", "待验收"):
                 return None, f"{self.ENTITY} {entry_id} 当前状态为'{entry.get('status')}'，不可终止"
 
-        return super().run_action(entry_id, action)
+        result, message = super().run_action(entry_id, action)
+        if result is not None and action in ("验收结对", "终止结对"):
+            # 延迟导入，避免与 pairing 的结对编排形成模块级循环依赖。
+            from app.services.pairing import close_pair
+
+            reason = "结对已验收结项" if action == "验收结对" else "结对已终止"
+            close_pair(entry_id, reason)
+            # close_pair 会释放目标上的名额占位并写回待办，回填最新状态。
+            if result.get("关联目标") not in (None, ""):
+                goal = store.find("semester_goal", int(result["关联目标"]))
+                if goal is not None:
+                    result["关联目标待办"] = goal.get("待办事项", "")
+        return result, message

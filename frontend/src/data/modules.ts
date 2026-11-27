@@ -168,6 +168,17 @@ export const MODULES: ModuleMeta[] = [
     metrics: ["结对记录总数", "进行中结对", "已结项结对"],
   },
   {
+    key: "mentor_roster",
+    name: "导师名额",
+    entity: "导师名额",
+    desc: "教研室主任在导师名额中维护指导方向和学期容量，青年教师从学期目标按学期检索并发起结对。",
+    fields: ["导师姓名", "指导方向", "学期", "职称", "所在教研室", "备注说明"],
+    statuses: ["开放", "已满", "已停用"],
+    actions: [],
+    actionTargets: {},
+    metrics: ["导师名额总数", "已满名额", "已停用名额"],
+  },
+  {
     key: "exam_analysis",
     name: "试卷分析",
     entity: "分析记录",
